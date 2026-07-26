@@ -10,6 +10,7 @@
 
 /* ---- 顶栏导航 ---- */
 .wfm-nav {
+    position: relative;
     width: 100%;
 }
 
@@ -95,7 +96,15 @@
     padding: 0 24px;
 }
 
-/* 全宽模式 */
+/* 全宽模式 — 突破父容器宽度限制 */
+.wfm-nav--full .wfm-submenu {
+    width: 100vw;
+    left: 50%;
+    right: auto;
+    margin-left: -50vw;
+    max-width: 100vw;
+}
+
 .wfm-nav--full .wfm-submenu__container {
     max-width: none;
     padding: 0 40px;
@@ -230,6 +239,15 @@
         right: 0;
         max-height: 70vh;
         overflow-y: auto;
+    }
+
+    /* 移动端重置 full 模式的 viewport 宽度技巧 */
+    .wfm-nav--full .wfm-submenu {
+        width: auto;
+        left: 0;
+        right: 0;
+        margin-left: 0;
+        max-width: none;
     }
 
     .wfm-nav--full .wfm-submenu__container {
