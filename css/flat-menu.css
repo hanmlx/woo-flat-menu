@@ -1,0 +1,236 @@
+/* ============================================
+   WooCommerce Flat Mega Menu
+   移植自 PrestaShop Hummingbird v3-patch
+   结构：一级横栏 → 全宽下拉 → 二级3列网格 → 三级列表
+   ============================================ */
+
+/* ---- 顶栏导航 ---- */
+.wfm-nav {
+    width: 100%;
+}
+
+.wfm-nav__list {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.wfm-nav__item {
+    position: static; /* 让下拉面板相对 nav 定位 */
+}
+
+.wfm-nav__item-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.wfm-nav__link {
+    display: block;
+    padding: 14px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+    text-decoration: none;
+    transition: color 0.2s;
+    white-space: nowrap;
+}
+
+.wfm-nav__link:hover {
+    color: #25b9d7;
+}
+
+.wfm-nav__item--has-children.active > .wfm-nav__item-wrapper > .wfm-nav__link {
+    color: #25b9d7;
+}
+
+/* 下拉箭头 */
+.wfm-nav__toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px 0 0;
+    margin-left: -8px;
+    font-size: 14px;
+    color: #999;
+    transition: transform 0.2s, color 0.2s;
+}
+
+.wfm-nav__item--has-children.active .wfm-nav__toggle {
+    transform: rotate(180deg);
+    color: #25b9d7;
+}
+
+.wfm-nav__toggle::after {
+    content: '\25BE'; /* ▾ */
+}
+
+/* ---- 下拉面板 ---- */
+.wfm-submenu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #ffffff;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border-top: 3px solid #25b9d7;
+}
+
+.wfm-nav__item--has-children.active > .wfm-submenu {
+    display: block;
+}
+
+.wfm-submenu__container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.wfm-submenu__content {
+    padding: 28px 0 32px;
+}
+
+/* ---- 网格容器 ---- */
+.wfm-submenu__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    row-gap: 32px;
+}
+
+/* ---- 每一列（二级分类） ---- */
+.wfm-submenu__col {
+    flex: 0 0 33.333%;
+    max-width: 33.333%;
+    padding: 0 20px;
+    border-right: 1px solid #eeeeee;
+}
+
+.wfm-submenu__col:nth-child(3n) {
+    border-right: none;
+}
+
+/* ---- 二级分类标题 ---- */
+.wfm-submenu__col-title {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+    text-decoration: none;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+    border-bottom: 2px solid #25b9d7;
+    transition: color 0.2s, border-color 0.2s;
+    letter-spacing: 0.01em;
+}
+
+.wfm-submenu__col-title:hover {
+    color: #25b9d7;
+    border-bottom-color: #1a1a1a;
+    text-decoration: none;
+}
+
+/* ---- 三级分类列表 ---- */
+.wfm-submenu__col-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wfm-submenu__col-list li {
+    margin-bottom: 2px;
+}
+
+.wfm-submenu__col-list li a {
+    display: block;
+    padding: 6px 0;
+    font-size: 13.5px;
+    color: #555555;
+    text-decoration: none;
+    line-height: 1.45;
+    transition: color 0.15s, padding-left 0.15s;
+    position: relative;
+}
+
+.wfm-submenu__col-list li a:hover {
+    color: #25b9d7;
+    padding-left: 8px;
+    text-decoration: none;
+}
+
+/* ---- 三级分类前面的小圆点（装饰） ---- */
+.wfm-submenu__col-list li a::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #cccccc;
+    margin-right: 8px;
+    vertical-align: middle;
+    transition: background 0.15s;
+}
+
+.wfm-submenu__col-list li a:hover::before {
+    background: #25b9d7;
+}
+
+/* ---- 响应式：平板一排2个 ---- */
+@media (max-width: 991.98px) {
+    .wfm-submenu__col {
+        flex: 0 0 50%;
+        max-width: 50%;
+        border-right: none;
+        border-bottom: 1px solid #eeeeee;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+    }
+
+    .wfm-submenu__col:nth-child(3n) {
+        border-right: none;
+    }
+
+    .wfm-submenu__col:nth-child(2n) {
+        border-right: none;
+    }
+}
+
+/* ---- 响应式：手机一排1个 + 滚动横栏 ---- */
+@media (max-width: 767.98px) {
+    .wfm-nav__list {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 0;
+    }
+
+    .wfm-nav__link {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    .wfm-submenu {
+        position: fixed;
+        top: auto;
+        left: 0;
+        right: 0;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .wfm-submenu__col {
+        flex: 0 0 100%;
+        max-width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #eeeeee;
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+    }
+
+    .wfm-submenu__content {
+        padding: 16px 0 20px;
+    }
+}
