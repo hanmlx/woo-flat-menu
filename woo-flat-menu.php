@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: WooCommerce Flat Mega Menu
- * Plugin URI: https://github.com/nexomi/woo-flat-menu
+ * Plugin URI: https://github.com/hanmlx/woo-flat-menu
  * Description: Auto-generate a flat grid mega menu from WooCommerce product categories. Replicates the PrestaShop Hummingbird menu layout.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: hanmlx
  * Text Domain: woo-flat-menu
  *
@@ -12,8 +12,6 @@
  *   Hover 一级 → 全宽下拉面板
  *   面板内 → 二级分类 3列网格平铺，每列下方列出三级分类
  *   无 Tab、无左右分栏
- *
- * v1.1.0: 后台可勾选要显示的分类（一级+二级），不勾选则显示全部
  */
 
 if (!defined('ABSPATH')) {
@@ -22,7 +20,7 @@ if (!defined('ABSPATH')) {
 
 class Woo_Flat_Menu {
 
-    const VERSION = '1.0.0';
+    const VERSION = '1.1.0';
     const OPTION_KEY = 'woo_flat_menu_settings';
 
     public function __construct() {
@@ -32,6 +30,7 @@ class Woo_Flat_Menu {
         // 后台设置页
         add_action('admin_menu', [$this, 'add_admin_page']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         // 产品分类增删时清除缓存
         add_action('created_product_cat', [$this, 'clear_cache']);
         add_action('edited_product_cat', [$this, 'clear_cache']);
@@ -48,21 +47,35 @@ class Woo_Flat_Menu {
     }
 
     /**
-     * 加载 CSS 和 JS
+     * 加载前端 CSS 和 JS + 注入动态颜色
      */
     public function enqueue_assets() {
         $base = plugin_dir_url(__FILE__);
         wp_enqueue_style('woo-flat-menu', $base . 'css/flat-menu.css', [], self::VERSION);
         wp_enqueue_script('woo-flat-menu', $base . 'js/flat-menu.js', [], self::VERSION, true);
+
+        // 注入动态颜色变量
+        $settings = $this->get_settings();
+        $color = $settings['accent_color'];
+        $custom_css = ":root { --wfm-accent: {$color}; }";
+        wp_add_inline_style('woo-flat-menu', $custom_css);
+    }
+
+    /**
+     * 后台加载颜色选择器
+     */
+    public function enqueue_admin_assets($hook) {
+        if ('toplevel_page_woo-flat-menu' !== $hook) {
+            return;
+        }
+        wp_enqueue_style('wp-color-picker');
+        wp_enqueue_script('wp-color-picker');
     }
 
     // =================================================================
     //  后台设置
     // =================================================================
 
-    /**
-     * 添加设置页
-     */
     public function add_admin_page() {
         add_menu_page(
             'Flat Menu 设置',
@@ -75,22 +88,19 @@ class Woo_Flat_Menu {
         );
     }
 
-    /**
-     * 注册设置
-     */
     public function register_settings() {
         register_setting('woo_flat_menu_group', self::OPTION_KEY, [
             'sanitize_callback' => [$this, 'sanitize_settings'],
         ]);
     }
 
-    /**
-     * 清理/格式化保存的数据
-     */
     public function sanitize_settings($input) {
         $clean = [
-            'selected_cats' => [],
-            'excluded_subcats' => [],
+            'selected_cats'      => [],
+            'excluded_subcats'   => [],
+            'accent_color'       => '#2563eb',
+            'hide_empty'         => 0,
+            'submenu_width'      => 'content',
         ];
 
         // 一级分类勾选
@@ -113,22 +123,38 @@ class Woo_Flat_Menu {
             }
         }
 
+        // 颜色
+        if (!empty($input['accent_color'])) {
+            $color = sanitize_hex_color($input['accent_color']);
+            if ($color) {
+                $clean['accent_color'] = $color;
+            }
+        }
+
+        // 隐藏空分类
+        $clean['hide_empty'] = !empty($input['hide_empty']) ? 1 : 0;
+
+        // 下拉宽度
+        if (!empty($input['submenu_width']) && in_array($input['submenu_width'], ['full', 'content'])) {
+            $clean['submenu_width'] = $input['submenu_width'];
+        }
+
         $this->clear_cache();
 
         return $clean;
     }
 
-    /**
-     * 获取设置（带默认值）
-     */
     private function get_settings() {
         $opts = get_option(self::OPTION_KEY, []);
         if (!is_array($opts)) {
             $opts = [];
         }
         return wp_parse_args($opts, [
-            'selected_cats'    => [],  // 空 = 显示全部一级分类
-            'excluded_subcats' => [],  // 空 = 不排除任何二级分类
+            'selected_cats'    => [],
+            'excluded_subcats' => [],
+            'accent_color'     => '#2563eb',
+            'hide_empty'       => 0,
+            'submenu_width'    => 'content',
         ]);
     }
 
@@ -139,8 +165,10 @@ class Woo_Flat_Menu {
         $settings  = $this->get_settings();
         $selected  = $settings['selected_cats'];
         $excluded  = $settings['excluded_subcats'];
+        $color     = $settings['accent_color'];
+        $hide_empty = $settings['hide_empty'];
+        $width     = $settings['submenu_width'];
 
-        // 获取所有一级分类
         $level1_cats = get_terms([
             'taxonomy'   => 'product_cat',
             'hide_empty' => false,
@@ -150,15 +178,64 @@ class Woo_Flat_Menu {
         ]);
 
         $all_selected = empty($selected);
-
         ?>
         <div class="wrap">
             <h1>Flat Menu 设置</h1>
-            <p>勾选要在菜单中显示的分类。不勾选任何一级分类 = 显示全部。</p>
 
             <form method="post" action="options.php">
                 <?php settings_fields('woo_flat_menu_group'); ?>
 
+                <!-- 外观设置 -->
+                <h2 class="title">外观设置</h2>
+                <table class="form-table">
+                    <tr>
+                        <th>主题色</th>
+                        <td>
+                            <input type="text"
+                                name="<?php echo esc_attr(self::OPTION_KEY); ?>[accent_color]"
+                                value="<?php echo esc_attr($color); ?>"
+                                class="wfm-color-picker" />
+                            <p class="description">用于链接 hover、下划线、边框等。默认 #2563eb（蓝色）。</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>下拉面板宽度</th>
+                        <td>
+                            <label>
+                                <input type="radio"
+                                    name="<?php echo esc_attr(self::OPTION_KEY); ?>[submenu_width]"
+                                    value="full"
+                                    <?php checked($width, 'full'); ?> />
+                                <strong>Full（全宽）</strong>
+                                <span class="description">面板横跨整个屏幕宽度</span>
+                            </label>
+                            <br />
+                            <label style="margin-top:8px;display:inline-block;">
+                                <input type="radio"
+                                    name="<?php echo esc_attr(self::OPTION_KEY); ?>[submenu_width]"
+                                    value="content"
+                                    <?php checked($width, 'content'); ?> />
+                                <strong>Content（内容宽度）</strong>
+                                <span class="description">面板最大宽度 1200px，居中显示</span>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>隐藏空分类</th>
+                        <td>
+                            <label>
+                                <input type="checkbox"
+                                    name="<?php echo esc_attr(self::OPTION_KEY); ?>[hide_empty]"
+                                    value="1"
+                                    <?php checked($hide_empty, 1); ?> />
+                                <strong>隐藏没有产品的子分类</strong>
+                            </label>
+                            <p class="description">勾选后，产品数量为 0 的二级和三级分类不会显示在菜单中。</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- 一级分类 -->
                 <h2 class="title">一级分类（顶栏）</h2>
                 <table class="form-table">
                     <tr>
@@ -170,7 +247,6 @@ class Woo_Flat_Menu {
                                 <span class="description">（勾选此项 = 忽略下面的勾选，显示所有一级分类）</span>
                             </label>
                             <hr style="margin: 12px 0;" />
-
                             <div style="display:flex;flex-wrap:wrap;gap:12px 24px;">
                                 <?php if (is_wp_error($level1_cats) || empty($level1_cats)): ?>
                                     <p>没有找到产品分类。先去 WooCommerce → 产品 → 分类 里添加一些。</p>
@@ -191,6 +267,7 @@ class Woo_Flat_Menu {
                     </tr>
                 </table>
 
+                <!-- 二级分类排除 -->
                 <?php if (!is_wp_error($level1_cats) && !empty($level1_cats)): ?>
                     <h2 class="title">二级分类排除（可选）</h2>
                     <p>勾选要从下拉面板中隐藏的二级分类。不勾选 = 显示全部。</p>
@@ -233,23 +310,22 @@ class Woo_Flat_Menu {
 
             <hr />
             <h3>使用方法</h3>
-            <p>在主题 Header Builder 或模板中插入 shortcode：</p>
+            <p>Shortcode：</p>
             <code>[woo_flat_menu]</code>
-            <p>或 PHP 直接调用：</p>
-            <code>&lt;?php echo do_shortcode('[woo_flat_menu]'); ?&gt;</code>
 
             <script>
             jQuery(function($){
+                // 颜色选择器
+                $('.wfm-color-picker').wpColorPicker();
+
                 // "显示全部" 互斥逻辑
                 $('#wfm-select-all').on('change', function(){
                     var checked = $(this).is(':checked');
                     $('.wfm-cat-checkbox').prop('checked', false).prop('disabled', checked);
                 });
-                // 初始状态
                 if ($('#wfm-select-all').is(':checked')) {
                     $('.wfm-cat-checkbox').prop('disabled', true);
                 }
-                // 单独勾选某个分类时，取消"显示全部"
                 $('.wfm-cat-checkbox').on('change', function(){
                     if ($(this).is(':checked')) {
                         $('#wfm-select-all').prop('checked', false);
@@ -262,9 +338,6 @@ class Woo_Flat_Menu {
         <?php
     }
 
-    /**
-     * 清除分类缓存
-     */
     public function clear_cache() {
         delete_transient('woo_flat_menu_tree');
     }
@@ -282,31 +355,28 @@ class Woo_Flat_Menu {
     // =================================================================
 
     private function get_category_tree() {
-        // 尝试缓存
         $cached = get_transient('woo_flat_menu_tree');
         if (false !== $cached) {
             return $cached;
         }
 
-        $settings = $this->get_settings();
-        $selected = $settings['selected_cats'];   // 要显示的一级分类 ID
-        $excluded = $settings['excluded_subcats']; // 要排除的二级分类 ID
+        $settings   = $this->get_settings();
+        $selected   = $settings['selected_cats'];
+        $excluded   = $settings['excluded_subcats'];
+        $hide_empty = !empty($settings['hide_empty']);
 
         $tree = [];
 
-        // 一级分类查询
         $level1_args = [
             'taxonomy'   => 'product_cat',
-            'hide_empty' => false,
+            'hide_empty' => false, // 一级始终显示
             'parent'     => 0,
             'orderby'    => 'menu_order',
             'order'      => 'ASC',
         ];
 
-        // 如果勾选了特定分类，用 include 过滤
         if (!empty($selected)) {
             $level1_args['include'] = $selected;
-            // include 时按 include 数组顺序排列
             $level1_args['orderby'] = 'include';
         }
 
@@ -326,20 +396,19 @@ class Woo_Flat_Menu {
                 'children'  => [],
             ];
 
-            // 缩略图
             $thumb_id = get_term_meta($cat1->term_id, 'thumbnail_id', true);
             if ($thumb_id) {
                 $node1['thumbnail'] = wp_get_attachment_url($thumb_id);
             }
 
-            // 二级分类
+            // 二级分类 — hide_empty 根据设置
             $level2 = get_terms([
                 'taxonomy'   => 'product_cat',
-                'hide_empty' => false,
+                'hide_empty' => $hide_empty,
                 'parent'     => $cat1->term_id,
                 'orderby'    => 'menu_order',
                 'order'      => 'ASC',
-                'exclude'    => $excluded, // 排除被勾选的二级分类
+                'exclude'    => $excluded,
             ]);
 
             if (!is_wp_error($level2) && !empty($level2)) {
@@ -352,10 +421,10 @@ class Woo_Flat_Menu {
                         'children' => [],
                     ];
 
-                    // 三级分类
+                    // 三级分类 — hide_empty 根据设置
                     $level3 = get_terms([
                         'taxonomy'   => 'product_cat',
-                        'hide_empty' => false,
+                        'hide_empty' => $hide_empty,
                         'parent'     => $cat2->term_id,
                         'orderby'    => 'menu_order',
                         'order'      => 'ASC',
@@ -379,14 +448,13 @@ class Woo_Flat_Menu {
             $tree[] = $node1;
         }
 
-        // 缓存 1 小时
         set_transient('woo_flat_menu_tree', $tree, HOUR_IN_SECONDS);
 
         return $tree;
     }
 
     // =================================================================
-    //  HTML 构建（和 PrestaShop v3 一致）
+    //  HTML 构建
     // =================================================================
 
     private function build_menu_html() {
@@ -396,14 +464,16 @@ class Woo_Flat_Menu {
             return '<!-- WooCommerce Flat Menu: 没有找到产品分类 -->';
         }
 
-        $html = '<nav class="wfm-nav" aria-label="Main navigation">';
+        $settings = $this->get_settings();
+        $width_class = $settings['submenu_width'] === 'full' ? ' wfm-nav--full' : '';
+
+        $html = '<nav class="wfm-nav' . $width_class . '" aria-label="Main navigation">';
         $html .= '<ul class="wfm-nav__list">';
 
         foreach ($tree as $cat1) {
             $has_children = !empty($cat1['children']);
             $html .= '<li class="wfm-nav__item' . ($has_children ? ' wfm-nav__item--has-children' : '') . '">';
 
-            // 一级分类链接
             $html .= '<div class="wfm-nav__item-wrapper">';
             $html .= '<a class="wfm-nav__link" href="' . esc_url($cat1['url']) . '" data-depth="1">';
             $html .= esc_html($cat1['name']);
@@ -414,7 +484,6 @@ class Woo_Flat_Menu {
             }
             $html .= '</div>';
 
-            // 下拉面板
             if ($has_children) {
                 $html .= $this->build_submenu($cat1);
             }
@@ -428,9 +497,6 @@ class Woo_Flat_Menu {
         return $html;
     }
 
-    /**
-     * 构建二级+三级分类面板（网格平铺）
-     */
     private function build_submenu($cat1) {
         $html = '<div class="wfm-submenu" role="menu" aria-label="' . esc_attr($cat1['name']) . ' submenu">';
         $html .= '<div class="wfm-submenu__container">';
@@ -439,13 +505,10 @@ class Woo_Flat_Menu {
 
         foreach ($cat1['children'] as $cat2) {
             $html .= '<div class="wfm-submenu__col">';
-
-            // 二级分类标题
             $html .= '<a class="wfm-submenu__col-title" href="' . esc_url($cat2['url']) . '" data-depth="2">';
             $html .= esc_html($cat2['name']);
             $html .= '</a>';
 
-            // 三级分类列表
             if (!empty($cat2['children'])) {
                 $html .= '<ul class="wfm-submenu__col-list">';
                 foreach ($cat2['children'] as $cat3) {
@@ -458,13 +521,13 @@ class Woo_Flat_Menu {
                 $html .= '</ul>';
             }
 
-            $html .= '</div>'; // .wfm-submenu__col
+            $html .= '</div>';
         }
 
-        $html .= '</div>'; // .wfm-submenu__grid
-        $html .= '</div>'; // .wfm-submenu__content
-        $html .= '</div>'; // .wfm-submenu__container
-        $html .= '</div>'; // .wfm-submenu
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '</div>';
 
         return $html;
     }

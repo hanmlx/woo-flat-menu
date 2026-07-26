@@ -4,6 +4,10 @@
    结构：一级横栏 → 全宽下拉 → 二级3列网格 → 三级列表
    ============================================ */
 
+:root {
+    --wfm-accent: #2563eb;
+}
+
 /* ---- 顶栏导航 ---- */
 .wfm-nav {
     width: 100%;
@@ -19,7 +23,7 @@
 }
 
 .wfm-nav__item {
-    position: static; /* 让下拉面板相对 nav 定位 */
+    position: static;
 }
 
 .wfm-nav__item-wrapper {
@@ -39,11 +43,11 @@
 }
 
 .wfm-nav__link:hover {
-    color: #25b9d7;
+    color: var(--wfm-accent);
 }
 
 .wfm-nav__item--has-children.active > .wfm-nav__item-wrapper > .wfm-nav__link {
-    color: #25b9d7;
+    color: var(--wfm-accent);
 }
 
 /* 下拉箭头 */
@@ -60,11 +64,11 @@
 
 .wfm-nav__item--has-children.active .wfm-nav__toggle {
     transform: rotate(180deg);
-    color: #25b9d7;
+    color: var(--wfm-accent);
 }
 
 .wfm-nav__toggle::after {
-    content: '\25BE'; /* ▾ */
+    content: '\25BE';
 }
 
 /* ---- 下拉面板 ---- */
@@ -77,17 +81,24 @@
     z-index: 9999;
     background: #ffffff;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-    border-top: 3px solid #25b9d7;
+    border-top: 3px solid var(--wfm-accent);
 }
 
 .wfm-nav__item--has-children.active > .wfm-submenu {
     display: block;
 }
 
+/* 内容宽度（默认） */
 .wfm-submenu__container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 24px;
+}
+
+/* 全宽模式 */
+.wfm-nav--full .wfm-submenu__container {
+    max-width: none;
+    padding: 0 40px;
 }
 
 .wfm-submenu__content {
@@ -123,13 +134,13 @@
     text-decoration: none;
     padding-bottom: 12px;
     margin-bottom: 14px;
-    border-bottom: 2px solid #25b9d7;
+    border-bottom: 2px solid var(--wfm-accent);
     transition: color 0.2s, border-color 0.2s;
     letter-spacing: 0.01em;
 }
 
 .wfm-submenu__col-title:hover {
-    color: #25b9d7;
+    color: var(--wfm-accent);
     border-bottom-color: #1a1a1a;
     text-decoration: none;
 }
@@ -157,12 +168,12 @@
 }
 
 .wfm-submenu__col-list li a:hover {
-    color: #25b9d7;
+    color: var(--wfm-accent);
     padding-left: 8px;
     text-decoration: none;
 }
 
-/* ---- 三级分类前面的小圆点（装饰） ---- */
+/* ---- 三级分类前面的小圆点 ---- */
 .wfm-submenu__col-list li a::before {
     content: '';
     display: inline-block;
@@ -176,7 +187,7 @@
 }
 
 .wfm-submenu__col-list li a:hover::before {
-    background: #25b9d7;
+    background: var(--wfm-accent);
 }
 
 /* ---- 响应式：平板一排2个 ---- */
@@ -219,6 +230,10 @@
         right: 0;
         max-height: 70vh;
         overflow-y: auto;
+    }
+
+    .wfm-nav--full .wfm-submenu__container {
+        padding: 0 16px;
     }
 
     .wfm-submenu__col {
